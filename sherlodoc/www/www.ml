@@ -91,6 +91,22 @@ let favicon_ico _ = static "image/x-icon" [%blob "sherlodoc/www/static/favicon.i
 let robots_txt _ = static "text/plain" [%blob "sherlodoc/www/static/robots.txt"]
 let bg_jpg _ = static "image/jpeg" [%blob "sherlodoc/www/static/bg.jpg"]
 
+(* Directory of odoc/odig-generated HTML to serve under [/doc/]. Search results link
+   here (see [Db.Entry.link]). Override with [SHERLODOC_DOC_DIR]; otherwise default to
+   odig's cache in the current opam switch. *)
+let doc_dir =
+  match Sys.getenv_opt "SHERLODOC_DOC_DIR" with
+  | Some dir -> Some dir
+  | None ->
+    (match Sys.getenv_opt "OPAM_SWITCH_PREFIX" with
+     | Some prefix -> Some (Filename.concat prefix "var/cache/odig/html")
+     | None -> None)
+
+let doc_route =
+  match doc_dir with
+  | Some dir -> [ Dream.get "/doc/**" (Dream.static dir) ]
+  | None -> []
+
 let main cache_max_age db_format db_filename =
   let module Storage = (val Db_store.storage_module db_format) in
   let shards = Storage.load db_filename in
@@ -99,22 +115,23 @@ let main cache_max_age db_format db_filename =
   @@ cache_header cache_max_age
   @@ cors_header
   @@ Dream.router
-       [ Dream.get
-           "/"
-           (root (fun params ->
-              let+ result = api ~shards params in
-              string_of_tyxml @@ Ui.template params.query result))
-       ; Dream.get
-           "/api"
-           (root (fun params ->
-              let+ result = api ~shards params in
-              string_of_tyxml' result))
-       ; Dream.get "/s.css" style_css
-       ; Dream.get "/robots.txt" robots_txt
-       ; Dream.get "/favicon.ico" favicon_ico
-       ; Dream.get "/bg.jpg" bg_jpg
-       ; cors_options
-       ]
+       ([ Dream.get
+            "/"
+            (root (fun params ->
+               let+ result = api ~shards params in
+               string_of_tyxml @@ Ui.template params.query result))
+        ; Dream.get
+            "/api"
+            (root (fun params ->
+               let+ result = api ~shards params in
+               string_of_tyxml' result))
+        ; Dream.get "/s.css" style_css
+        ; Dream.get "/robots.txt" robots_txt
+        ; Dream.get "/favicon.ico" favicon_ico
+        ; Dream.get "/bg.jpg" bg_jpg
+        ]
+        @ doc_route
+        @ [ cors_options ])
 
 open Cmdliner
 

@@ -4,6 +4,14 @@ let non_empty_string s =
   (* to protect against `ancient` segfaulting on statically allocated values *)
   if s = "" then empty_string else s
 
+(* Base URL under which the odoc/odig HTML is served. Links are [<doc_base>/<pkg>/<path>],
+   matching odig's [html/<pkg>/<Module>/.../index.html] layout. Defaults to the [/doc/]
+   route served by [sherlodoc serve]; override for an external static host. *)
+let doc_base =
+  match Sys.getenv_opt "SHERLODOC_DOC_BASE" with
+  | Some base -> base
+  | None -> "/doc"
+
 module Kind = struct
   type t =
     | Doc (** Standalone doc comment *)
@@ -43,7 +51,7 @@ module Package = struct
     { name = non_empty_string name; version = non_empty_string version }
 
   let compare a b = String.compare a.name b.name
-  let link { name; version } = "https://ocaml.org/p/" ^ name ^ "/" ^ version
+  let link { name; version = _ } = doc_base ^ "/" ^ name ^ "/index.html"
 end
 
 type t =
@@ -100,55 +108,31 @@ let compare a b =
 
 let equal a b = compare a b = 0
 
-let stdlib_link ~name t =
-  let path, hashref =
-    match List.rev name, String.index_opt t.url '#' with
-    | _ :: path, Some idx ->
-        let idx = idx + 1 in
-        let tgt =
-          match String.index_from_opt t.url idx '-' with
-          | None -> String.sub t.url idx (String.length t.url - idx)
-          | Some jdx ->
-              let kind = String.sub t.url idx (jdx - idx) in
-              let jdx = jdx + 1 in
-              let target = String.sub t.url jdx (String.length t.url - jdx) in
-              String.uppercase_ascii kind ^ target
-        in
-        path, "#" ^ tgt
-    | path, _ -> path, ""
-  in
-  let path = String.concat "." (List.rev path) in
-  "https://v2.ocaml.org/releases/5.1/api/" ^ path ^ ".html" ^ hashref
-
 let link t =
   let fullname = String.split_on_char '.' t.name in
-  match fullname with
-  | "Stdlib" :: name -> stdlib_link ~name t
-  | _ ->
-      let pkg_link = Package.link t.pkg in
-      let rec align n ys =
-        match ys with
-        | _ when n = 0 -> []
-        | [] -> []
-        | y :: ys -> y :: align (n - 1) ys
-      in
-      let length = List.length fullname in
-      let length =
-        match String.index_opt t.url '#' with
-        | None -> length + 1
-        | Some idx ->
-            let tgt = String.sub t.url idx (String.length t.url - idx) in
-            let count = ref 0 in
-            String.iter
-              (function
-                | '.' -> incr count
-                | _ -> ())
-              tgt ;
-            length - !count
-      in
-      let path = align length (List.rev (String.split_on_char '/' t.url)) in
-      let path = String.concat "/" (List.rev path) in
-      pkg_link ^ "/doc/" ^ path
+  let rec align n ys =
+    match ys with
+    | _ when n = 0 -> []
+    | [] -> []
+    | y :: ys -> y :: align (n - 1) ys
+  in
+  let length = List.length fullname in
+  let length =
+    match String.index_opt t.url '#' with
+    | None -> length + 1
+    | Some idx ->
+        let tgt = String.sub t.url idx (String.length t.url - idx) in
+        let count = ref 0 in
+        String.iter
+          (function
+            | '.' -> incr count
+            | _ -> ())
+          tgt ;
+        length - !count
+  in
+  let path = align length (List.rev (String.split_on_char '/' t.url)) in
+  let path = String.concat "/" (List.rev path) in
+  doc_base ^ "/" ^ t.pkg.name ^ "/" ^ path
 
 let v ~name ~kind ~cost ~rhs ~doc_html ~url ~pkg () =
   { name = non_empty_string name
