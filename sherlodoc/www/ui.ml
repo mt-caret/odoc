@@ -10,6 +10,8 @@ let string_of_kind =
   let open Db.Entry.Kind in
   function
   | Doc -> "doc"
+  | Page -> "doc"
+  | Impl -> "source"
   | Type_decl None -> "type"
   | Type_decl (Some str) -> "type " ^ str
   | Module -> "module"
