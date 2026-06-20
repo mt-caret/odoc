@@ -120,7 +120,7 @@ let run_inner ~odoc_dir ~odocl_dir ~index_dir ~mld_dir ~compile_grep ~link_grep
           let l = run.Run.cmd |> String.concat ~sep:" " in
           if String.is_infix ~affix l then Format.printf "%s: %s\n" prefix l
       in
-      List.iter grep !Cmd_outputs.outputs
+      List.iter grep (Cmd_outputs.get_outputs ())
     in
     Option.iter do_ s
   in
@@ -160,7 +160,7 @@ let run_inner ~odoc_dir ~odocl_dir ~index_dir ~mld_dir ~compile_grep ~link_grep
                List.iter (fun l -> Logs.app (fun m -> m "%s" l)) lines;
                Logs.app (fun m -> m ""))
       | _ -> ())
-    !Cmd_outputs.outputs;
+    (Cmd_outputs.get_outputs ());
 
   if stats then Stats.bench_results html_dir
 

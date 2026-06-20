@@ -126,7 +126,7 @@ let run package_name blessed actions odoc_dir odocl_dir
                let lines = String.split_on_char '\n' content in
                List.iter (fun l -> Format.printf "%s: %s\n" prefix l) lines
       | _ -> ())
-    !Cmd_outputs.outputs
+    (Cmd_outputs.get_outputs ())
 
 open Cmdliner
 

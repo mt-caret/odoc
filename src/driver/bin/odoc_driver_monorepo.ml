@@ -80,7 +80,7 @@ let real_run ~odoc_dir ~odocl_dir ~index_dir ~mld_dir path extra_pkgs extra_libs
                let lines = String.split_on_char '\n' content in
                List.iter (fun l -> Format.printf "%s: %s\n" prefix l) lines
       | _ -> ())
-    !Cmd_outputs.outputs;
+    (Cmd_outputs.get_outputs ());
 
   if stats then Stats.bench_results html_dir
 

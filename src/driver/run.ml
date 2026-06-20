@@ -26,6 +26,17 @@ let commands = ref []
 
 let n = Atomic.make 0
 
+(* The environment passed to every spawned command is the driver's own process
+   environment, which is constant over a run, so build it once rather than
+   re-reading and re-folding it per command. *)
+let child_env =
+  lazy
+    (let env = OS.Env.current () |> Result.get_ok in
+     Astring.String.Map.fold
+       (fun k v env -> Astring.String.concat [ k; "="; v ] :: env)
+       env []
+     |> Array.of_list)
+
 (** Return the list of executed commands where the first argument was [cmd]. *)
 let run env cmd output_file =
   let cmd = Bos.Cmd.to_list cmd in
@@ -33,16 +44,7 @@ let run env cmd output_file =
   Logs.debug (fun m -> m "%d - Executing: %s" myn (String.concat " " cmd));
   let proc_mgr = Eio.Stdenv.process_mgr env in
   let t_start = Unix.gettimeofday () in
-  let env =
-    let env = OS.Env.current () |> Result.get_ok in
-    env
-  in
-  let env =
-    Astring.String.Map.fold
-      (fun k v env -> Astring.String.concat [ k; "="; v ] :: env)
-      env []
-    |> Array.of_list
-  in
+  let env = Lazy.force child_env in
   (* Logs.debug (fun m -> m "Running cmd %a" Fmt.(list ~sep:sp string) cmd); *)
   let output, errors, status =
     Eio.Switch.run ~name:"Process.parse_out" @@ fun sw ->
