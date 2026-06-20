@@ -1449,16 +1449,19 @@ end)
 
 module Depends = struct
   module Compile = struct
+    let print_dependencies input_files =
+      let deps =
+        Depends.for_compile_step (List.map ~f:Fs.File.of_string input_files)
+      in
+      List.iter
+        ~f:(fun t ->
+          Printf.printf "%s %s\n" (Depends.Compile.name t)
+            (Digest.to_hex @@ Depends.Compile.digest t))
+        deps
+
     let list_dependencies input_files =
       try
-        let deps =
-          Depends.for_compile_step (List.map ~f:Fs.File.of_string input_files)
-        in
-        List.iter
-          ~f:(fun t ->
-            Printf.printf "%s %s\n" (Depends.Compile.name t)
-              (Digest.to_hex @@ Depends.Compile.digest t))
-          deps;
+        print_dependencies input_files;
         flush stdout
       with Cmi_format.Error e ->
         let msg =
@@ -1474,12 +1477,46 @@ module Depends = struct
         Printf.eprintf "ERROR: %s\n%!" msg;
         exit 1
 
+    (* Persistent-worker mode: read one input file path per line on stdin and
+       print its dependencies followed by a blank line (dependency lines are
+       never blank, so the reader frames responses on it), until stdin closes.
+       This lets a driver reuse one process for many files, paying odoc's
+       process-startup cost once instead of per file. *)
+    let worker () =
+      try
+        while true do
+          let file = input_line stdin in
+          (* Never let one bad file kill the worker: emit an empty response (just
+             the terminator) so the driver can fall back for it and keep going. *)
+          (try print_dependencies [ file ]
+           with e -> Printf.eprintf "ERROR: %s\n%!" (Printexc.to_string e));
+          print_char '\n';
+          flush stdout
+        done
+      with End_of_file -> ()
+
+    let run worker_mode input_files =
+      match (worker_mode, input_files) with
+      | true, _ -> worker ()
+      | false, [] ->
+          Printf.eprintf "ERROR: no input files\n%!";
+          exit 1
+      | false, _ -> list_dependencies input_files
+
     let cmd =
       let input =
         let doc = "Input files" in
-        Arg.(non_empty & pos_all file [] & info ~doc ~docv:"file.cm{i,t,ti}" [])
+        Arg.(value & pos_all file [] & info ~doc ~docv:"file.cm{i,t,ti}" [])
       in
-      Term.(const list_dependencies $ input)
+      let worker_mode =
+        let doc =
+          "Run as a persistent worker: read one input file path per line on \
+           stdin, print its dependencies followed by a blank line, and repeat \
+           until stdin is closed."
+        in
+        Arg.(value & flag & info ~doc [ "worker" ])
+      in
+      Term.(const run $ worker_mode $ input)
 
     let info ~docs =
       Cmd.info "compile-deps" ~docs
