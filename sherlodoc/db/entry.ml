@@ -108,31 +108,9 @@ let compare a b =
 
 let equal a b = compare a b = 0
 
-let link t =
-  let fullname = String.split_on_char '.' t.name in
-  let rec align n ys =
-    match ys with
-    | _ when n = 0 -> []
-    | [] -> []
-    | y :: ys -> y :: align (n - 1) ys
-  in
-  let length = List.length fullname in
-  let length =
-    match String.index_opt t.url '#' with
-    | None -> length + 1
-    | Some idx ->
-        let tgt = String.sub t.url idx (String.length t.url - idx) in
-        let count = ref 0 in
-        String.iter
-          (function
-            | '.' -> incr count
-            | _ -> ())
-          tgt ;
-        length - !count
-  in
-  let path = align length (List.rev (String.split_on_char '/' t.url)) in
-  let path = String.concat "/" (List.rev path) in
-  doc_base ^ "/" ^ t.pkg.name ^ "/" ^ path
+(* [t.url] is the odoc/odig HTML path from the doc root, already including the package
+   segment ([<pkg>/<lib>/<Module>/.../index.html#anchor] for odoc-driver output). *)
+let link t = doc_base ^ "/" ^ t.url
 
 let v ~name ~kind ~cost ~rhs ~doc_html ~url ~pkg () =
   { name = non_empty_string name
