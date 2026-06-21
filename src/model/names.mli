@@ -11,6 +11,10 @@ val contains_double_underscore : string -> bool
 
 val set_unique_ident : string -> unit
 
+val reset_unique_id : unit -> unit
+(** Reset the per-unit identifier state (the unique id and the shadowed-name
+    counter) so a single process can read another unit as if freshly started. *)
+
 (** Name is the signature for names that could possibly be hidden. Hidden names
     occur when we generate items that don't have a path that will be exposed in
     the generated HTML. This can occur for a few reasons:

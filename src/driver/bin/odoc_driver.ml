@@ -50,6 +50,7 @@ let run_inner ~odoc_dir ~odocl_dir ~index_dir ~mld_dir ~compile_grep ~link_grep
   Eio.Switch.run @@ fun sw ->
   let () = Worker_pool.start_workers env sw nb_workers in
   Compile_deps_pool.init ~sw env ~odoc:!Odoc.odoc ~count:nb_workers;
+  Odoc_worker_pool.init ~sw env ~odoc:!Odoc.odoc ~count:nb_workers;
   let all = Packages.of_packages ~packages_dir:None packages in
   let all = Packages.remap_virtual all in
   let extra_paths = Voodoo.empty_extra_paths in

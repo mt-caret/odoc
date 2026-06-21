@@ -669,6 +669,12 @@ module Identifier = struct
     let name = Printf.sprintf "module_arg_%d_" !module_arg_parent_counter in
     (Mk.root (None, ModuleName.hidden_of_string name) :> Signature.t)
 
+  (* Restart the synthetic-parent counters so a reused process emits the same
+     [include%d_]/[module_arg_%d_] names as a fresh one. *)
+  let reset_counters () =
+    include_parent_counter := 0;
+    module_arg_parent_counter := 0
+
   module Hashtbl = struct
     module Any = Hashtbl.Make (Any)
     module ContainerPage = Hashtbl.Make (ContainerPage)

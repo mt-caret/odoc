@@ -54,14 +54,20 @@ let convert_named_root =
   in
   Arg.conv (parse, print)
 
+(* In persistent-worker mode a failed command must not kill the process; raise
+   instead of [exit] so the worker loop can report the failure and continue. *)
+let worker_active = ref false
+
+exception Command_failed
+
 let handle_error = function
   | Ok () -> ()
   | Error (`Cli_error msg) ->
       Printf.eprintf "%s\n%!" msg;
-      exit 2
+      if !worker_active then raise Command_failed else exit 2
   | Error (`Msg msg) ->
       Printf.eprintf "ERROR: %s\n%!" msg;
-      exit 1
+      if !worker_active then raise Command_failed else exit 1
 
 module Antichain = struct
   let absolute_normalization p =
@@ -1869,8 +1875,47 @@ let () =
     let info = Cmd.info ~man ~version:"%%VERSION%%" "odoc" in
     Cmd.group ~default info subcommands
   in
-  match Cmd.eval_value ~err:Format.err_formatter main with
-  | Error _ ->
-      Format.pp_print_flush Format.err_formatter ();
-      exit 2
-  | _ -> ()
+  (* Persistent-worker mode: each request is an odoc argv (one argument per line,
+     ended by a blank line); reset per-unit global state, run the command via the
+     same reusable [main], and reply with a single OK/ERR line. This reuses one
+     process for many compile/link/html-generate commands, paying odoc's startup
+     cost once. *)
+  let run_worker () =
+    worker_active := true;
+    let reset_global_state () =
+      Odoc_model.Names.reset_unique_id ();
+      Odoc_model.Paths.Identifier.reset_counters ();
+      Odoc_xref2.Ident.reset ();
+      Resolver.clear_caches ();
+      Odoc_xref2.Tools.reset_caches ()
+    in
+    try
+      while true do
+        (* Request framing: a line with the argument count, then that many lines
+           (one argument each, possibly empty). *)
+        let n = int_of_string (input_line stdin) in
+        let args = ref [] in
+        for _ = 1 to n do
+          args := input_line stdin :: !args
+        done;
+        let args = List.rev !args in
+        reset_global_state ();
+        let argv = Array.of_list ("odoc" :: args) in
+        let ok =
+          match Cmd.eval_value ~argv ~catch:true main with
+          | Ok (`Ok () | `Help | `Version) -> true
+          | Error _ -> false
+        in
+        print_string (if ok then "OK\n" else "ERR\n");
+        flush stdout
+      done
+    with End_of_file -> ()
+  in
+  match Sys.argv with
+  | [| _; "worker" |] -> run_worker ()
+  | _ -> (
+      match Cmd.eval_value ~err:Format.err_formatter main with
+      | Error _ ->
+          Format.pp_print_flush Format.err_formatter ();
+          exit 2
+      | _ -> ())

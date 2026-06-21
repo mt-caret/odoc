@@ -42,6 +42,16 @@ let compile_deps f =
   | [ (_, digest) ], deps -> Ok { digest; deps }
   | _ -> Error (`Msg "odd")
 
+(* Run an odoc command on a persistent worker if one is available, falling back
+   to a one-shot subprocess otherwise. Used for the commands whose stdout we do
+   not need to capture (compile/link/html-generate). A worker [ERR] is raised
+   like a one-shot non-zero exit so the caller's error handling is unchanged. *)
+let run_odoc log desc cmd output_file =
+  match Odoc_worker_pool.run cmd with
+  | Some (Ok ()) -> ()
+  | Some (Error exn) -> raise exn
+  | None -> ignore @@ Cmd_outputs.submit log desc cmd output_file
+
 let compile ~output_dir ~input_file:file ~includes ~warnings_tag ~parent_id
     ~ignore_output =
   let open Cmd in
@@ -69,7 +79,7 @@ let compile ~output_dir ~input_file:file ~includes ~warnings_tag ~parent_id
   let log =
     if ignore_output then None else Some (`Compile, Fpath.to_string file)
   in
-  ignore @@ Cmd_outputs.submit log desc cmd output_file
+  run_odoc log desc cmd output_file
 
 let compile_md ~output_dir ~input_file:file ~parent_id =
   let open Cmd in
@@ -178,7 +188,7 @@ let link ?(ignore_output = false) ~custom_layout ~input_file:file ?output_file
   let log =
     if ignore_output then None else Some (`Link, Fpath.to_string file)
   in
-  ignore @@ Cmd_outputs.submit log desc cmd (Some output_file)
+  run_odoc log desc cmd (Some output_file)
 
 let compile_index ?(ignore_output = false) ~output_file ?occurrence_file ~json
     ~roots ~simplified ~wrap () =
@@ -252,7 +262,7 @@ let html_generate ~output_dir ?sidebar ?(ignore_output = false)
   let log =
     if ignore_output then None else Some (`Generate, Fpath.to_string file)
   in
-  ignore @@ Cmd_outputs.submit log desc cmd None
+  run_odoc log desc cmd None
 
 let html_generate_asset ~output_dir ?(ignore_output = false) ?home_breadcrumb
     ~input_file:file ~asset_path () =

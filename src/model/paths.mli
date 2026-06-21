@@ -22,6 +22,10 @@ module Ocaml_env = Env
 module Identifier : sig
   (** {2 Generic operations} *)
 
+  val reset_counters : unit -> unit
+  (** Reset the synthetic-parent counters used for [include] and module-argument
+      identifiers, so a reused process emits the same names as a fresh one. *)
+
   type 'a id = 'a Paths_types.id = { iv : 'a; ihash : int; ikey : string }
 
   module type IdSig = sig

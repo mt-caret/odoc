@@ -74,3 +74,7 @@ val resolve_import : t -> string -> Root.t option
 (** Similar to {!Odoc_xref2.Env.lookup_root_module} but save work by loading
     only the root. Only used when resolving imports, which are needed for the
     [link-deps] command. *)
+
+val clear_caches : unit -> unit
+(** Clear the process-global unit cache so a reused process does not serve stale
+    [.odoc] content. Call between units. *)

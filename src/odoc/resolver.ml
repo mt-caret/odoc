@@ -230,6 +230,13 @@ let load_unit_from_file path =
 
 let self = ref None
 
+(* The unit cache is process-global and keyed by file path, so a reused process
+   would serve stale [.odoc] content for a dependency recompiled in the same run.
+   Clear it (and the lazily-built self resolver) between units. *)
+let clear_caches () =
+  Hashtbl.reset unit_cache;
+  self := None
+
 (** Load every units matching a given name. Cached. *)
 let load_units_from_name =
   let safe_read file acc =

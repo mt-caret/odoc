@@ -66,6 +66,14 @@ let set_unique_ident id =
   | Some _ -> failwith "Unique id already set"
   | None -> unique_id := Some id
 
+(* Reset the per-unit identifier state so the same process can read another unit:
+   [unique_id] must return to [None] (otherwise [set_unique_ident] is swallowed
+   and the previous unit's id leaks into this one's shadowed names) and the
+   shadowed-name counter must restart for output identical to a fresh process. *)
+let reset_unique_id () =
+  unique_id := None;
+  internal_counter := 0
+
 module Name : Name = struct
   type t =
     | Hidden of string

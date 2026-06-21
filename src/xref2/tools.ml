@@ -343,7 +343,8 @@ let reset_caches () =
   LookupModuleMemo.clear ();
   LookupAndResolveMemo.clear ();
   ExpansionOfModuleMemo.clear ();
-  LookupParentMemo.clear ()
+  LookupParentMemo.clear ();
+  HandleCanonicalModuleMemo.clear ()
 
 let simplify_module : Env.t -> Cpath.Resolved.module_ -> Cpath.Resolved.module_
     =
