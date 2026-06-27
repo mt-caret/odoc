@@ -506,7 +506,14 @@ let read_parsetree_core_type (ct : Parsetree.core_type) =
   match ct.ptyp_desc with
   | Ptyp_var (s, _) -> Var s
   | Ptyp_any _ -> Any
-  | _ -> failwith "invalid core type"
+  | _ -> Any
+  (* Total fallback: render an unsupported [with]-bound core type as [_] rather
+     than raising [Failure] and aborting odoc on the whole compilation unit
+     (e.g. base's [Map_intf]). A faithful rendering (a resolved, linked
+     [TypeExpr.Constr]) would need the typing environment threaded into this
+     function to turn the surface [Longident.t] into a [Path.Type.t]; that is a
+     larger refactor and is currently unsolved upstream (this [failwith] is
+     identical on ocaml/odoc master). *)
 
 let rec read_jkind_annotation (jk : Parsetree.jkind_annotation) =
   let open Kind in
