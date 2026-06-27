@@ -24,11 +24,21 @@ let maybe_log log_dest run =
 (* The logged command outputs, in execution order. *)
 let get_outputs () = List.rev !outputs
 
+(* When [ODOC_DRIVER_KEEP_GOING] is set, a failed odoc command is logged and
+   skipped instead of aborting the whole run -- quarantines a single bad unit so
+   the rest of the switch is still documented, and lets a full crash inventory be
+   collected in one pass. *)
+let keep_going = Sys.getenv_opt "ODOC_DRIVER_KEEP_GOING" <> None
+
 let submit log_dest desc cmd output_file =
   match Worker_pool.submit desc cmd output_file with
   | Ok x ->
       maybe_log log_dest x;
       String.split_on_char '\n' x.output
+  | Error exn when keep_going ->
+      Logs.err (fun m ->
+          m "[keep-going] skipping failed command: %s" (Printexc.to_string exn));
+      []
   | Error exn -> raise exn
 
 let submit_ignore_failures log_dest desc cmd output_file =

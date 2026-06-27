@@ -49,6 +49,9 @@ let compile_deps f =
 let run_odoc log desc cmd output_file =
   match Odoc_worker_pool.run cmd with
   | Some (Ok ()) -> ()
+  | Some (Error exn) when Cmd_outputs.keep_going ->
+      Logs.err (fun m ->
+          m "[keep-going] skipping failed unit: %s" (Printexc.to_string exn))
   | Some (Error exn) -> raise exn
   | None -> ignore @@ Cmd_outputs.submit log desc cmd output_file
 
